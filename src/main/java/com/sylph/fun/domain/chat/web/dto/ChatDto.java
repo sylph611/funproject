@@ -14,12 +14,14 @@ public class ChatDto {
 
     private String id;
     private String name;
+    private String password;
     private int maxCount;
 
     @Builder
-    private ChatDto(String id, String name, int maxCount) {
+    public ChatDto(String id, String name, String password, int maxCount) {
         this.id = id;
         this.name = name;
+        this.password = password;
         this.maxCount = maxCount;
     }
 
