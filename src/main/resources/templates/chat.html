@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>채팅</title>
+</head>
+<body>
+<h1>채팅방</h1>
+<div id="chatConnect">
+    <button onclick="connectSocket()">채팅 시작하기</button>
+</div>
+
+<div id="chat" hidden="hidden">
+    <input id="message">
+    <button id="sendBtn">전송</button>
+    <div id="chatBox"></div>
+</div>
+
+<ul class="roomList" id="roomList">
+    <!-- data are comes from local storage -->
+    <li> blahblahblah <span class="icon" onclick=""><i class="fas fa-sign-in-alt"></i></span></li>
+</ul>
+
+<div class="board" id="board">board</div>
+
+<div class="chat_wrap" id="chat_wrap">
+    <div class="header">
+        CHAT
+    </div>
+    <div class="chat">
+        <ul>
+            <!-- 동적 생성 -->
+        </ul>
+    </div>
+    <div class="input-div">
+        <textarea placeholder="Press Enter for send message."></textarea>
+    </div>
+
+    <!-- format -->
+
+    <div class="chat format">
+        <ul>
+            <li>
+                <div class="sender">
+                    <span></span>
+                </div>
+                <div class="message">
+                    <span></span>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
+
+<link rel="stylesheet" type="text/css" th:href="@{/css/chat.css}"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"/>
+<script src="/webjars/jquery/dist/jquery.min.js"></script>
+<script src="/webjars/sockjs-client/sockjs.min.js"></script>
+<script src="/webjars/stomp-websocket/stomp.min.js"></script>
+<script type="text/javascript">
+
+    var sock;
+    var client;
+
+    $(document).ready(function() {
+        const roomList = document.querySelector(".roomList");
+
+
+        $('#board').hide();
+        $('#chat_wrap').hide();
+
+        $.ajax({
+            type: "GET",
+            url: "/api/chat/list",
+            dataType: "json",
+            error: function() {
+                console.log('통신실패!!');
+            },
+            success: function(data) {
+                var listArray = data;
+
+                var newLiTag = "";
+                listArray.forEach((element, index) => {
+                    newLiTag += `<li>${element.name}<span class="icon" onclick="join(element.id)"><i class="fas fa-sign-in-alt"></i></span></li>`;
+                });
+                roomList.innerHTML = newLiTag; //adding new li tag inside ul tag
+
+            }
+        });
+    });
+
+    function connectSocket() {
+        sock = new SockJS("/ws/chat");
+        client = Stomp.over(sock);
+
+        sock.onerror = function () {
+            alert('연결에 실패하였습니다.');
+            $('#chatConnect').show();
+            $('#chat').hide();
+        };
+
+        sock.onclose = function () {
+            alert('연결을 종료합니다.');
+            $('#chatConnect').show();
+            $('#chat').hide();
+        };
+
+        client.connect({}, function(){
+            alert('연결에 성공하였습니다.');
+            $('#chatConnect').hide();
+            $('#chat').show();
+
+            client.subscribe('/sub/chat', function(chat) {
+                var content = JSON.parse(chat.body);
+                const LR = (content.sender !== "sender") ? "left" : "right";
+                appendMessageTag( LR , content.sender, content.message);
+                $("<p>" + content.message + "</p>").prependTo('#chatBox');
+            });
+
+        });
+    }
+
+    function createMessageTag(LR_className, senderName, message) {
+        // 형식 가져오기
+        let chatLi = $('div.chat.format ul li').clone();
+
+        // 값 채우기
+        chatLi.addClass(LR_className);
+        chatLi.find('.sender span').text(senderName);
+        chatLi.find('.message span').text(message);
+
+        return chatLi;
+    }
+
+    // 메세지 태그 append
+    function appendMessageTag(LR_className, senderName, message) {
+        const chatLi = createMessageTag(LR_className, senderName, message);
+
+        $('div.chat:not(.format) ul').append(chatLi);
+
+        // 스크롤바 아래 고정
+        $('div.chat').scrollTop($('div.chat').prop('scrollHeight'));
+    }
+
+    function sendMessage() {
+        client.send('/pub/chat', {}, JSON.stringify({
+            sender: "sender",
+            message: $("#message").val()})
+        );
+        $('#message').val("");
+    }
+
+    $("#message").keyup(e => {
+        if (e.keyCode == 13) {
+            sendMessage();
+        }
+    });
+
+    $("#sendBtn").click(() => {
+        sendMessage();
+    });
+
+
+</script>
+</body>
+</html>
