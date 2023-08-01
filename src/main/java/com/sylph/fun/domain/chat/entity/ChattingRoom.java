@@ -11,10 +11,11 @@ import java.util.UUID;
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Chat {
+@Table(name = "chattingRoom")
+public class ChattingRoom {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(nullable = false)
     private String name;
@@ -26,22 +27,22 @@ public class Chat {
     private int maxCount;
 
     @Builder
-    private Chat(UUID id, String name, String password, int maxCount) {
+    private ChattingRoom(Long id, String name, String password, int maxCount) {
         this.id = id;
         this.name = name;
         this.password = password;
         this.maxCount = maxCount;
     }
 
-    public static Chat of(String name, String password, int maxCount) {
-        return Chat.builder()
+    public static ChattingRoom of(String name, String password, int maxCount) {
+        return ChattingRoom.builder()
                 .name(name)
                 .password(password)
                 .maxCount(maxCount)
                 .build();
     }
 
-    public static Chat of(String name, String password) {
-        return Chat.of(name,password,2);
+    public static ChattingRoom of(String name, String password) {
+        return ChattingRoom.of(name,password,2);
     }
 }

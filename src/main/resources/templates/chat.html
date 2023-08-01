@@ -7,18 +7,16 @@
 <body>
 <h1>채팅방</h1>
 <div id="chatConnect">
-    <button onclick="connectSocket()">채팅 시작하기</button>
+    <button onclick="sendGame()">게임내용보내기</button>
 </div>
-
 <div id="chat" hidden="hidden">
-    <input id="message">
     <button id="sendBtn">전송</button>
     <div id="chatBox"></div>
 </div>
 
 <ul class="roomList" id="roomList">
     <!-- data are comes from local storage -->
-    <li> blahblahblah <span class="icon" onclick=""><i class="fas fa-sign-in-alt"></i></span></li>
+    <li> blahblahblah <span class="icon" onclick="join(element.id)"><i class="fas fa-sign-in-alt"></i></span></li>
 </ul>
 
 <div class="board" id="board">board</div>
@@ -33,7 +31,7 @@
         </ul>
     </div>
     <div class="input-div">
-        <textarea placeholder="Press Enter for send message."></textarea>
+        <textarea id="tx" placeholder="Press Enter for send message."></textarea>
     </div>
 
     <!-- format -->
@@ -44,7 +42,7 @@
                 <div class="sender">
                     <span></span>
                 </div>
-                <div class="message">
+                <div class="message" id="message">
                     <span></span>
                 </div>
             </li>
@@ -61,7 +59,10 @@
 <script type="text/javascript">
 
     var sock;
+    var sockGame;
     var client;
+    var clientGame;
+    var _id;
 
     $(document).ready(function() {
         const roomList = document.querySelector(".roomList");
@@ -82,7 +83,7 @@
 
                 var newLiTag = "";
                 listArray.forEach((element, index) => {
-                    newLiTag += `<li>${element.name}<span class="icon" onclick="join(element.id)"><i class="fas fa-sign-in-alt"></i></span></li>`;
+                    newLiTag += `<li>${element.name}<span class="icon" onclick="join(${element.id})"><i class="fas fa-sign-in-alt"></i></span></li>`;
                 });
                 roomList.innerHTML = newLiTag; //adding new li tag inside ul tag
 
@@ -90,7 +91,26 @@
         });
     });
 
-    function connectSocket() {
+    function join(id) {
+        $.ajax({
+            type: "GET",
+            url: "/api/chat/"+id,
+            dataType: "json",
+            error: function() {
+                console.log('통신실패!!');
+            },
+            success: function(data) {
+                connectSocket(id);
+                connectSocketGame(id);
+                $('#board').show();
+                $('#chat_wrap').show();
+                _id = id;
+            }
+        });
+
+    }
+
+    function connectSocket(id) {
         sock = new SockJS("/ws/chat");
         client = Stomp.over(sock);
 
@@ -108,17 +128,51 @@
 
         client.connect({}, function(){
             alert('연결에 성공하였습니다.');
-            $('#chatConnect').hide();
             $('#chat').show();
 
-            client.subscribe('/sub/chat', function(chat) {
-                var content = JSON.parse(chat.body);
+            client.subscribe('/sub/chat/'+id, function(response) {
+                var content = JSON.parse(response.body);
                 const LR = (content.sender !== "sender") ? "left" : "right";
                 appendMessageTag( LR , content.sender, content.message);
                 $("<p>" + content.message + "</p>").prependTo('#chatBox');
             });
-
         });
+    }
+
+    function connectSocketGame(id) {
+        sockGame = new SockJS("/ws/game");
+        clientGame = Stomp.over(sockGame);
+
+        sockGame.onerror = function () {
+            alert('연결에 실패하였습니다.');
+            $('#chatConnect').show();
+            $('#chat').hide();
+        };
+
+        sockGame.onclose = function () {
+            alert('연결을 종료합니다.');
+            $('#chatConnect').show();
+            $('#chat').hide();
+        };
+
+        clientGame.connect({}, function(){
+            alert('연결에 성공하였습니다.');
+            $('#chatConnect').hide();
+            $('#chat').show();
+
+            clientGame.subscribe('/sub/game/'+id, function(response) {
+                var content = JSON.parse(response.body);
+                var str = content.x +" "+content.y;
+                $('div.board').text(str);
+            });
+        });
+    }
+
+    function sendGame() {
+        clientGame.send('/pub/game/'+_id, {}, JSON.stringify({
+            x: "1",
+            y: "2"})
+        );
     }
 
     function createMessageTag(LR_className, senderName, message) {
@@ -144,14 +198,14 @@
     }
 
     function sendMessage() {
-        client.send('/pub/chat', {}, JSON.stringify({
+        client.send('/pub/chat/'+_id, {}, JSON.stringify({
             sender: "sender",
-            message: $("#message").val()})
+            message: $("#tx").val()})
         );
-        $('#message').val("");
+        $('#tx').val("");
     }
 
-    $("#message").keyup(e => {
+    $("#tx").keyup(e => {
         if (e.keyCode == 13) {
             sendMessage();
         }
